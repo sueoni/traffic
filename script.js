@@ -44,6 +44,7 @@ const UNIPASS_CANDIDATE_ENDPOINTS = [
 ]
 const PRESET_KEY = 'unipass_presets_v2'
 const UNIPASS_KEY_STORAGE = 'unipass_api_key_v1'
+const FETCH_TIMEOUT_MS = 10000
 
 const exportEl = document.getElementById('export-country')
 const importEl = document.getElementById('import-country')
@@ -204,7 +205,8 @@ function drawTrendChart(baseRate) {
     return Number((baseRate + curve).toFixed(1))
   })
 
-  const width = 320
+  const responsiveWidth = Math.max(240, Math.min(320, Math.floor(chartEl.clientWidth || 320)))
+  const width = responsiveWidth
   const height = 180
   const padding = 20
   const max = Math.max(...points) + 1
@@ -259,7 +261,30 @@ function updateSummary(rate = null) {
 function renderMessage(message, tone = 'default') {
   const toneClass = tone === 'error' ? 'text-rose-700' : tone === 'success' ? 'text-emerald-700' : 'text-slate-800'
   resultEl.className = `mt-3 rounded-2xl border border-border bg-white p-3 text-base leading-relaxed ${toneClass}`
+  const maxLength = 180
+  if (tone === 'error' && message.length > maxLength) {
+    resultEl.textContent = `${message.slice(0, maxLength)}...`
+    console.error(message)
+    return
+  }
+
   resultEl.textContent = message
+}
+
+function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout))
+}
+
+function maskSensitiveUrl(rawUrl) {
+  const masked = new URL(rawUrl)
+  ;['apiKey', 'serviceKey', 'crkyCn'].forEach((key) => {
+    const value = masked.searchParams.get(key)
+    if (!value) return
+    masked.searchParams.set(key, `${value.slice(0, 4)}****`)
+  })
+  return masked.toString()
 }
 
 function buildWorldBankUrl(importer) {
@@ -313,7 +338,7 @@ function parseUniPassRate(payload) {
 
 async function requestTariff(url) {
   try {
-    const direct = await fetch(url)
+    const direct = await fetchWithTimeout(url)
     if (!direct.ok) throw new Error(`HTTP ${direct.status}`)
     const json = await direct.json()
     const parsed = extractWorldBankRate(json)
@@ -323,7 +348,7 @@ async function requestTariff(url) {
   }
 
   const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-  const proxy = await fetch(proxyUrl)
+  const proxy = await fetchWithTimeout(proxyUrl)
   if (!proxy.ok) throw new Error(`Proxy HTTP ${proxy.status}`)
   const proxyText = await proxy.text()
   const proxyParsed = extractWorldBankRate(JSON.parse(proxyText))
@@ -333,23 +358,63 @@ async function requestTariff(url) {
 
 async function requestUniPassTariff(importer, hsCode, apiKey = '') {
   const urls = buildUniPassUrls(importer, hsCode, apiKey)
+  let lastEndpoint = ''
+  let lastStatus = 'no-response'
+  let parseFailed = false
+
+  const parseFromXml = (xmlText) => {
+    const xmlDoc = new DOMParser().parseFromString(xmlText, 'text/xml')
+    const candidateTags = ['rate', 'tariffRate', 'fncConvRate', 'advalRate', 'taxRate']
+
+    for (const tag of candidateTags) {
+      const node = xmlDoc.getElementsByTagName(tag)?.[0]
+      const value = Number(node?.textContent?.trim())
+      if (Number.isFinite(value)) return value
+    }
+
+    const rawText = xmlDoc.documentElement?.textContent || xmlText
+    const matched = rawText.match(/(\d+(\.\d+)?)/)
+    const value = Number(matched?.[1])
+    return Number.isFinite(value) ? value : null
+  }
+
   for (const url of urls) {
+    lastEndpoint = maskSensitiveUrl(url)
     try {
       const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-      const res = await fetch(proxyUrl)
+      const res = await fetchWithTimeout(proxyUrl)
+      lastStatus = `${res.status}`
       if (!res.ok) continue
 
-      const payload = await res.json()
-      const parsed = parseUniPassRate(payload)
-      if (parsed) {
-        return { ...parsed, endpoint: url }
+      const bodyText = await res.text()
+      let parsed = null
+
+      try {
+        const payload = JSON.parse(bodyText)
+        parsed = parseUniPassRate(payload)
+      } catch {
+        const xmlRate = parseFromXml(bodyText)
+        if (Number.isFinite(xmlRate)) {
+          parsed = { rate: xmlRate, year: new Date().getFullYear().toString() }
+        }
       }
+
+      if (parsed) {
+        return {
+          ...parsed,
+          year: parsed.year || new Date().getFullYear().toString(),
+          endpoint: lastEndpoint
+        }
+      }
+
+      parseFailed = true
     } catch {
+      lastStatus = 'request-failed'
       // 다음 후보 엔드포인트 재시도
     }
   }
 
-  throw new Error('UNI-PASS 응답을 받지 못했습니다.')
+  throw new Error(`UNI-PASS 실패 (endpoint=${lastEndpoint || 'none'}, status=${lastStatus}, parseFailed=${parseFailed})`)
 }
 
 async function fetchUniPassRate() {
@@ -372,7 +437,8 @@ async function fetchUniPassRate() {
       renderMessage(`UNI-PASS 조회 완료 (기준연도 ${uniPassResult.year})`, 'success')
       updateSummary(Number(uniPassResult.rate.toFixed(1)))
       return
-    } catch {
+    } catch (uniPassError) {
+      console.error('UNI-PASS 조회 실패', uniPassError)
       // UNI-PASS 실패 시 기존 방식 유지
     }
 
@@ -387,7 +453,8 @@ async function fetchUniPassRate() {
   } catch (error) {
     const fallbackRate = calculateFallbackRate()
     dataStatusEl.textContent = '대체값'
-    renderMessage(`조회 실패: ${error.message} · 대체값 표시`, 'error')
+    const timeoutNotice = error.name === 'AbortError' ? '네트워크 지연/프록시 응답 없음. ' : ''
+    renderMessage(`${timeoutNotice}조회 실패: ${error.message} · 대체값 표시`, 'error')
     updateSummary(fallbackRate)
   } finally {
     fetchBtn.disabled = false
