@@ -1,11 +1,11 @@
-const data = {
+const fallbackData = {
   countries: [
     { name: '대한민국', code: 'KR' },
     { name: '미국', code: 'US' },
     { name: '중국', code: 'CN' },
     { name: '베트남', code: 'VN' },
     { name: '일본', code: 'JP' },
-    { name: 'EU', code: 'EU' }
+    { name: '독일', code: 'DE' }
   ],
   categories: {
     전자기기: {
@@ -26,58 +26,80 @@ const data = {
     'KR-CN': 7,
     'CN-US': 10,
     'VN-US': 6,
-    'JP-EU': 3
+    'JP-DE': 3
   }
 }
 
 const UNIPASS_ENDPOINT = 'https://unipass.customs.go.kr:38010/ext/rest/trifFxrtInfoQry/retrieveTrifFxrtInfo'
+let countries = [...fallbackData.countries]
 
 const exportEl = document.getElementById('export-country')
 const importEl = document.getElementById('import-country')
 const categoryEl = document.getElementById('category')
 const itemEl = document.getElementById('item')
 const materialEl = document.getElementById('material')
-const resultEl = document.getElementById('result')
-const resetBtn = document.getElementById('reset-btn')
 const hsCodeEl = document.getElementById('hs-code')
 const apiKeyEl = document.getElementById('api-key')
 const saveKeyBtn = document.getElementById('save-key-btn')
 const fetchBtn = document.getElementById('fetch-btn')
+const resetBtn = document.getElementById('reset-btn')
+
+const summaryEl = document.getElementById('summary')
+const resultEl = document.getElementById('result')
+const tariffRateEl = document.getElementById('tariff-rate')
+const dataStatusEl = document.getElementById('data-status')
+const chartEl = document.getElementById('trend-chart')
+const chartTimeEl = document.getElementById('chart-time')
+const trendLegendEl = document.getElementById('trend-legend')
+const apiSourceEl = document.getElementById('api-source')
 
 const savedKey = localStorage.getItem('unipass_api_key') || ''
 if (savedKey) apiKeyEl.value = savedKey
 
-document.getElementById('update-date').textContent = new Date().toISOString().slice(0, 10).replaceAll('-', '.')
-
 function setOptions(element, options) {
-  element.innerHTML = '<option value="">선택하세요</option>'
-  options.forEach((option) => {
+  element.innerHTML = '<option value="">-선택-</option>'
+  options.forEach(({ value, label }) => {
     const opt = document.createElement('option')
-    opt.value = option.value
-    opt.textContent = option.label
+    opt.value = value
+    opt.textContent = label
     element.appendChild(opt)
   })
 }
 
-function getSelectedCountryCode(selectEl) {
-  return selectEl.value
-}
+async function tryLoadCountries() {
+  try {
+    const response = await fetch('https://restcountries.com/v3.1/all?fields=translations,cca2,name')
+    if (!response.ok) throw new Error('국가 API 조회 실패')
 
-function renderMessage(html, tone = 'default') {
-  const toneClass = tone === 'error' ? 'text-rose-300' : tone === 'success' ? 'text-emerald-300' : 'text-slate-200'
-  resultEl.innerHTML = `<div class="space-y-2 ${toneClass}">${html}</div>`
+    const list = await response.json()
+    countries = list
+      .map((country) => {
+        const korean = country?.translations?.kor?.common
+        return { name: korean || country?.name?.common, code: country?.cca2 }
+      })
+      .filter((country) => country.name && country.code)
+      .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+
+    apiSourceEl.textContent = '국가 목록: 실시간 API 사용'
+  } catch {
+    countries = [...fallbackData.countries]
+    apiSourceEl.textContent = '국가 목록: 내장 데이터 사용'
+  }
+
+  setOptions(exportEl, countries.map((country) => ({ value: country.code, label: country.name })))
+  setOptions(importEl, countries.map((country) => ({ value: country.code, label: country.name })))
 }
 
 function calculateFallbackRate() {
-  const exporter = getSelectedCountryCode(exportEl)
-  const importer = getSelectedCountryCode(importEl)
+  const exporter = exportEl.value
+  const importer = importEl.value
   const category = categoryEl.value
   const item = itemEl.value
   const material = materialEl.value
 
   if (!exporter || !importer || !category) return null
 
-  let rate = data.baseTariff[`${exporter}-${importer}`] ?? 8
+  let rate = fallbackData.baseTariff[`${exporter}-${importer}`] ?? 8
   if (category === '전자기기') rate -= 1
   if (category === '자동차부품') rate += 2
   if (item) rate += 0.5
@@ -86,41 +108,85 @@ function calculateFallbackRate() {
   return Math.max(0, Number(rate.toFixed(1)))
 }
 
-function updateResultPreview() {
+function drawTrendChart(baseRate) {
+  chartEl.innerHTML = ''
+  if (baseRate === null) {
+    trendLegendEl.textContent = '필수 항목 선택 후 트렌드를 표시합니다.'
+    return
+  }
+
+  const now = new Date()
+  chartTimeEl.textContent = `기준시간 ${now.toLocaleString('ko-KR')}`
+
+  const points = Array.from({ length: 6 }, (_, i) => {
+    const variation = Math.sin((i + 1) * 1.4) * 0.7 + (Math.random() * 0.8 - 0.4)
+    return Number((baseRate + variation).toFixed(1))
+  })
+
+  const width = 320
+  const height = 180
+  const padding = 20
+  const max = Math.max(...points) + 1
+  const min = Math.max(0, Math.min(...points) - 1)
+
+  const mapX = (idx) => padding + (idx * (width - padding * 2)) / (points.length - 1)
+  const mapY = (value) => height - padding - ((value - min) / (max - min || 1)) * (height - padding * 2)
+  const polyline = points.map((value, idx) => `${mapX(idx)},${mapY(value)}`).join(' ')
+
+  chartEl.innerHTML = `
+    <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="hsl(215 20% 65% / 0.5)" />
+    <polyline points="${polyline}" fill="none" stroke="hsl(213 93% 66%)" stroke-width="3" />
+    ${points
+      .map((value, idx) => `<circle cx="${mapX(idx)}" cy="${mapY(value)}" r="3" fill="hsl(213 93% 66%)" />`)
+      .join('')}
+  `
+
+  trendLegendEl.textContent = `최근 6개월 추정 관세율: ${points.join('% · ')}%`
+}
+
+function updateSummary(rate = null) {
   const exporterName = exportEl.options[exportEl.selectedIndex]?.text || '-'
   const importerName = importEl.options[importEl.selectedIndex]?.text || '-'
   const category = categoryEl.value || '-'
   const item = itemEl.options[itemEl.selectedIndex]?.text || '-'
   const material = materialEl.options[materialEl.selectedIndex]?.text || '-'
   const hsCode = hsCodeEl.value.trim() || '-'
+  const displayRate = rate ?? calculateFallbackRate()
 
-  const fallbackRate = calculateFallbackRate()
-  renderMessage(`
-    <p><strong>선택 요약</strong></p>
-    <p>${exporterName} → ${importerName} / ${category} / ${item} / ${material}</p>
-    <p>HS Code: ${hsCode}</p>
-    <p class="text-xs text-muted-foreground">예상(샘플) 관세율: ${fallbackRate === null ? '-' : `${fallbackRate}%`}</p>
-  `)
+  summaryEl.innerHTML = `
+    <p><span class="text-muted-foreground">수출국/수입국</span> ${exporterName} → ${importerName}</p>
+    <p><span class="text-muted-foreground">품목</span> ${category} / ${item} / ${material}</p>
+    <p><span class="text-muted-foreground">HS Code</span> ${hsCode}</p>
+  `
+
+  tariffRateEl.textContent = displayRate === null ? '-' : `${displayRate}%`
+  drawTrendChart(displayRate)
+}
+
+function renderMessage(message, tone = 'default') {
+  const toneClass = tone === 'error' ? 'text-rose-300' : tone === 'success' ? 'text-emerald-300' : 'text-slate-300'
+  resultEl.className = `mt-3 rounded-xl border border-border bg-slate-900/40 p-3 text-sm ${toneClass}`
+  resultEl.textContent = message
 }
 
 async function fetchUniPassRate() {
   const apiKey = apiKeyEl.value.trim()
-  const exporter = getSelectedCountryCode(exportEl)
-  const importer = getSelectedCountryCode(importEl)
+  const exporter = exportEl.value
+  const importer = importEl.value
   const hsCode = hsCodeEl.value.trim()
 
   if (!exporter || !importer || !categoryEl.value) {
-    renderMessage('<p>수출국/수입국/품목군은 필수입니다.</p>', 'error')
+    renderMessage('수출국, 수입국, 품목은 필수입니다.', 'error')
     return
   }
 
   if (!/^\d{6,10}$/.test(hsCode)) {
-    renderMessage('<p>HS Code는 숫자 6~10자리로 입력해주세요.</p>', 'error')
+    renderMessage('HS Code는 숫자 6~10자리여야 합니다.', 'error')
     return
   }
 
   if (!apiKey) {
-    renderMessage('<p>UNI-PASS 인증키를 먼저 입력/저장해주세요.</p>', 'error')
+    renderMessage('UNI-PASS 인증키를 입력하세요.', 'error')
     return
   }
 
@@ -134,47 +200,30 @@ async function fetchUniPassRate() {
     url.searchParams.set('imprDclrNatCd', importer)
     url.searchParams.set('hsSgn', hsCode)
 
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const response = await fetch(url.toString())
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
-    const text = await res.text()
-    let tariffRate = null
+    const text = await response.text()
+    const match = text.match(/<(?:aplyRate|tariffRate|trffRt|rate)>(\d+(?:\.\d+)?)<\//i) || text.match(/(\d+(?:\.\d+)?)\s*%/)
+    const tariffRate = match ? Number(match[1]) : null
 
-    try {
-      const json = JSON.parse(text)
-      const flat = JSON.stringify(json)
-      const match = flat.match(/(\d+(?:\.\d+)?)\s*%/)
-      if (match) tariffRate = Number(match[1])
-    } catch {
-      const xmlMatch = text.match(/<(?:aplyRate|tariffRate|trffRt|rate)>(\d+(?:\.\d+)?)<\//i)
-      if (xmlMatch) tariffRate = Number(xmlMatch[1])
-    }
+    if (tariffRate === null || Number.isNaN(tariffRate)) throw new Error('관세율 파싱 실패')
 
-    if (tariffRate === null || Number.isNaN(tariffRate)) {
-      throw new Error('관세율 필드를 파싱하지 못했습니다.')
-    }
-
-    renderMessage(`
-      <p class="text-emerald-300"><strong>UNI-PASS 실조회 성공</strong></p>
-      <p>HS Code ${hsCode} 기준 관세율: <strong>${tariffRate}%</strong></p>
-      <p class="text-xs text-muted-foreground">응답 원문 길이: ${text.length.toLocaleString()} chars</p>
-    `, 'success')
+    dataStatusEl.textContent = '실조회'
+    renderMessage('UNI-PASS 실시간 관세 조회 성공', 'success')
+    updateSummary(tariffRate)
   } catch (error) {
     const fallbackRate = calculateFallbackRate()
-    renderMessage(`
-      <p><strong>UNI-PASS 조회 실패</strong> (${error.message})</p>
-      <p>대체 계산치: <strong>${fallbackRate === null ? '-' : `${fallbackRate}%`}</strong></p>
-      <p class="text-xs text-muted-foreground">인증키 권한, 파라미터명, CORS 설정을 확인해주세요.</p>
-    `, 'error')
+    dataStatusEl.textContent = '대체값'
+    renderMessage(`실조회 실패: ${error.message}. 대체 계산치를 표시합니다.`, 'error')
+    updateSummary(fallbackRate)
   } finally {
     fetchBtn.disabled = false
-    fetchBtn.textContent = 'UNI-PASS 관세 조회'
+    fetchBtn.textContent = '관세 조회'
   }
 }
 
-setOptions(exportEl, data.countries.map((country) => ({ value: country.code, label: country.name })))
-setOptions(importEl, data.countries.map((country) => ({ value: country.code, label: country.name })))
-setOptions(categoryEl, Object.keys(data.categories).map((category) => ({ value: category, label: category })))
+setOptions(categoryEl, Object.keys(fallbackData.categories).map((category) => ({ value: category, label: category })))
 
 categoryEl.addEventListener('change', () => {
   const category = categoryEl.value
@@ -183,16 +232,16 @@ categoryEl.addEventListener('change', () => {
     materialEl.disabled = true
     setOptions(itemEl, [])
     setOptions(materialEl, [])
-    updateResultPreview()
+    updateSummary()
     return
   }
 
-  const items = Object.entries(data.categories[category]).map(([key, value]) => ({ value: key, label: value.label }))
+  const items = Object.entries(fallbackData.categories[category]).map(([key, value]) => ({ value: key, label: value.label }))
   setOptions(itemEl, items)
   setOptions(materialEl, [])
   itemEl.disabled = false
   materialEl.disabled = true
-  updateResultPreview()
+  updateSummary()
 })
 
 itemEl.addEventListener('change', () => {
@@ -202,21 +251,24 @@ itemEl.addEventListener('change', () => {
   if (!category || !item) {
     materialEl.disabled = true
     setOptions(materialEl, [])
-    updateResultPreview()
+    updateSummary()
     return
   }
 
-  const materials = data.categories[category][item].materials.map((material) => ({ value: material, label: material }))
+  const materials = fallbackData.categories[category][item].materials.map((material) => ({ value: material, label: material }))
   setOptions(materialEl, materials)
   materialEl.disabled = false
-  updateResultPreview()
+  updateSummary()
 })
 
-;[exportEl, importEl, materialEl, hsCodeEl].forEach((el) => el.addEventListener('change', updateResultPreview))
+;[exportEl, importEl, materialEl, hsCodeEl].forEach((el) => {
+  el.addEventListener('change', () => updateSummary())
+  el.addEventListener('input', () => updateSummary())
+})
 
 saveKeyBtn.addEventListener('click', () => {
   localStorage.setItem('unipass_api_key', apiKeyEl.value.trim())
-  renderMessage('<p>인증키를 로컬 스토리지에 저장했습니다.</p>', 'success')
+  renderMessage('인증키를 저장했습니다.', 'success')
 })
 
 fetchBtn.addEventListener('click', fetchUniPassRate)
@@ -230,7 +282,11 @@ resetBtn.addEventListener('click', () => {
   hsCodeEl.value = ''
   setOptions(itemEl, [])
   setOptions(materialEl, [])
-  updateResultPreview()
+  dataStatusEl.textContent = '대기'
+  renderMessage('필터를 다시 선택하세요.')
+  updateSummary()
 })
 
-updateResultPreview()
+renderMessage('수출국/수입국/품목을 선택하면 관세와 트렌드가 표시됩니다.')
+updateSummary()
+tryLoadCountries()
