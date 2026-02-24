@@ -12,6 +12,8 @@
 - iPhone 포함 모바일 화면에서 터치 영역과 텍스트 대비를 강화해 시인성 개선
 - 배민체(Jua) 느낌의 둥글고 귀여운 톤 + 저채도 파스텔 대비 색상으로 눈부심 완화
 - UNI-PASS 관세율 조회 우선 시도, 실패 시 오픈 API(World Bank) 및 내장 기준값으로 자동 fallback
+- UNI-PASS API Key 입력/저장 지원 (브라우저 LocalStorage)
+- iPhone 모바일 터치 환경에 맞춘 입력/버튼 배치 최적화
 
 ## 실행
 ```bash
