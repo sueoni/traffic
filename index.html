@@ -16,109 +16,109 @@
               sans: ['Jua', 'Nunito', 'system-ui', 'sans-serif']
             },
             colors: {
-              border: 'hsl(323 42% 90% / 0.45)',
-              ring: 'hsl(266 88% 78%)',
-              background: 'hsl(229 74% 95%)',
-              foreground: 'hsl(244 38% 28%)',
-              card: 'hsl(0 0% 100% / 0.56)',
-              pastel: 'hsl(292 72% 74%)',
-              mint: 'hsl(178 69% 72%)',
-              peach: 'hsl(20 95% 82%)'
+              border: 'hsl(248 30% 82%)',
+              ring: 'hsl(244 48% 58%)',
+              background: 'hsl(234 42% 94%)',
+              foreground: 'hsl(240 28% 25%)',
+              card: 'hsl(0 0% 100% / 0.84)',
+              point: 'hsl(236 42% 74%)',
+              soft: 'hsl(228 46% 88%)'
             },
             boxShadow: {
-              glass: '0 10px 28px rgba(132, 118, 199, 0.2), inset 0 1px 0 rgba(255,255,255,0.52)'
+              soft: '0 8px 20px rgba(86, 92, 152, 0.13)'
             }
           }
         }
       }
     </script>
   </head>
-  <body class="min-h-screen bg-background bg-[radial-gradient(circle_at_0%_0%,rgba(244,195,255,0.9),transparent_30%),radial-gradient(circle_at_100%_0%,rgba(170,236,255,0.88),transparent_32%),radial-gradient(circle_at_50%_100%,rgba(255,221,200,0.85),transparent_38%)] font-sans text-foreground antialiased selection:bg-pastel/40">
-    <main class="mx-auto w-full max-w-5xl space-y-4 px-3 py-4 sm:space-y-5 sm:px-4 sm:py-6">
-      <header class="rounded-3xl border border-border bg-card p-5 shadow-glass backdrop-blur-xl sm:p-6">
-        <p class="mb-2 inline-flex rounded-full border border-white/50 bg-white/35 px-3 py-1 text-xs tracking-wide text-violet-700">UNI-PASS · 모바일 최적화</p>
-        <h1 class="text-[1.8rem] leading-tight text-violet-900 sm:text-4xl">관세 조회 카드</h1>
-        <p class="mt-2 text-base leading-relaxed text-violet-800/90">사진에 있는 국가/품목만 담아 단순하고 귀엽게, iPhone에서도 버튼과 글자가 또렷하게 보이도록 구성했습니다.</p>
+  <body class="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-soft">
+    <main class="mx-auto w-full max-w-5xl space-y-4 px-3 py-4 sm:px-4 sm:py-6">
+      <header class="rounded-3xl border border-border bg-card p-5 shadow-soft sm:p-6">
+        <p class="mb-2 inline-flex rounded-full border border-border bg-white px-3 py-1 text-xs tracking-wide">UNI-PASS</p>
+        <h1 class="text-3xl leading-tight sm:text-4xl">관세 조회</h1>
+        <p class="mt-2 text-base leading-7">국가·품목 선택 후 관세를 확인하세요.</p>
       </header>
 
-      <section class="grid gap-4 lg:grid-cols-3">
-        <article class="space-y-4 rounded-3xl border border-border bg-card p-4 shadow-glass backdrop-blur-xl sm:p-5 lg:col-span-2">
-          <div class="flex items-center justify-between">
-            <h2 class="text-2xl text-violet-900">빠른 선택</h2>
-            <button id="reset-btn" class="min-h-12 rounded-2xl border border-white/60 bg-white/45 px-4 text-base text-violet-800 transition hover:bg-white/70">초기화</button>
+      <section class="grid gap-4 lg:grid-cols-2">
+        <article class="space-y-4 rounded-3xl border border-border bg-card p-4 shadow-soft sm:p-5">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-2xl">빠른 선택</h2>
+            <button id="reset-btn" class="min-h-12 rounded-2xl border border-border bg-white px-4 text-base">초기화</button>
           </div>
 
-          <div class="rounded-2xl border border-white/55 bg-white/35 p-3 sm:p-4">
+          <div class="rounded-2xl border border-border bg-white/80 p-3 sm:p-4">
             <div class="mb-2 flex items-center justify-between">
-              <h3 class="text-lg text-violet-900">프리셋</h3>
-              <button id="save-preset-btn" class="min-h-11 rounded-xl bg-pastel px-3 text-sm text-violet-950">현재 조건 저장</button>
+              <h3 class="text-lg">프리셋</h3>
+              <button id="save-preset-btn" class="min-h-11 rounded-xl bg-point px-3 text-sm text-slate-900">저장</button>
             </div>
             <div class="flex gap-2">
-              <input id="preset-name" maxlength="24" placeholder="예: 베트남→한국 사출" class="min-h-12 min-w-0 flex-1 rounded-2xl border border-white/60 bg-white/55 px-3 text-base outline-none focus:ring-2 focus:ring-ring" />
-              <button id="delete-preset-btn" class="min-h-12 rounded-2xl border border-white/60 bg-white/45 px-3 text-sm text-violet-800">삭제</button>
+              <input id="preset-name" maxlength="24" placeholder="예: 베트남→한국 사출" class="min-h-12 min-w-0 flex-1 rounded-2xl border border-border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring" />
+              <button id="delete-preset-btn" class="min-h-12 rounded-2xl border border-border bg-white px-3 text-sm">삭제</button>
             </div>
-            <select id="preset-list" class="mt-2 min-h-12 w-full rounded-2xl border border-white/60 bg-white/55 px-3 text-base outline-none focus:ring-2 focus:ring-ring">
+            <select id="preset-list" class="mt-2 min-h-12 w-full rounded-2xl border border-border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring">
               <option value="">저장된 프리셋 없음</option>
             </select>
           </div>
 
           <div class="grid gap-3">
             <label class="space-y-1.5 text-base">
-              <span class="text-violet-800">수출국</span>
-              <select id="export-country" class="min-h-12 w-full rounded-2xl border border-white/60 bg-white/55 px-3 text-[1.05rem] outline-none focus:ring-2 focus:ring-ring">
+              <span>수출국</span>
+              <select id="export-country" class="min-h-12 w-full rounded-2xl border border-border bg-white px-3 text-[1.05rem] outline-none focus:ring-2 focus:ring-ring">
                 <option value="">-선택-</option>
               </select>
             </label>
 
             <label class="space-y-1.5 text-base">
-              <span class="text-violet-800">수입국</span>
-              <select id="import-country" class="min-h-12 w-full rounded-2xl border border-white/60 bg-white/55 px-3 text-[1.05rem] outline-none focus:ring-2 focus:ring-ring">
+              <span>수입국</span>
+              <select id="import-country" class="min-h-12 w-full rounded-2xl border border-border bg-white px-3 text-[1.05rem] outline-none focus:ring-2 focus:ring-ring">
                 <option value="">-선택-</option>
               </select>
             </label>
 
             <label class="space-y-1.5 text-base">
-              <span class="text-violet-800">품목</span>
-              <select id="category" class="min-h-12 w-full rounded-2xl border border-white/60 bg-white/55 px-3 text-[1.05rem] outline-none focus:ring-2 focus:ring-ring">
+              <span>품목</span>
+              <select id="category" class="min-h-12 w-full rounded-2xl border border-border bg-white px-3 text-[1.05rem] outline-none focus:ring-2 focus:ring-ring">
                 <option value="">-선택-</option>
               </select>
             </label>
           </div>
         </article>
 
-        <article class="space-y-3 rounded-3xl border border-border bg-card p-4 shadow-glass backdrop-blur-xl sm:p-5">
-          <h2 class="text-2xl text-violet-900">조회</h2>
+        <article class="space-y-3 rounded-3xl border border-border bg-card p-4 shadow-soft sm:p-5">
+          <h2 class="text-2xl">조회</h2>
           <label class="space-y-1.5 text-base">
-            <span class="text-violet-800">UNI-PASS 인증키</span>
-            <input id="api-key" type="password" placeholder="인증키 입력" class="min-h-12 w-full rounded-2xl border border-white/60 bg-white/55 px-3 text-base outline-none focus:ring-2 focus:ring-ring" />
+            <span>UNI-PASS 인증키</span>
+            <input id="api-key" type="password" placeholder="인증키 입력" class="min-h-12 w-full rounded-2xl border border-border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring" />
           </label>
-          <button id="save-key-btn" class="min-h-12 w-full rounded-2xl border border-white/60 bg-white/45 text-base text-violet-800">키 저장</button>
-          <button id="fetch-btn" class="min-h-12 w-full rounded-2xl bg-gradient-to-r from-pastel to-mint text-base text-violet-950">관세 조회</button>
-          <p id="api-source" class="text-sm leading-relaxed text-violet-700"></p>
+          <button id="save-key-btn" class="min-h-12 w-full rounded-2xl border border-border bg-white text-base">키 저장</button>
+          <button id="fetch-btn" class="min-h-12 w-full rounded-2xl bg-point text-base text-slate-900">관세 조회</button>
+          <a href="https://www.customs.go.kr/kcs/na/ntt/selectNttInfo.do?mi=10819&bbsId=1363&nttSn=10014061" target="_blank" rel="noreferrer" class="block rounded-2xl border border-border bg-white px-3 py-3 text-sm underline underline-offset-4">인증키 발급 안내</a>
+          <p id="api-source" class="text-sm leading-relaxed"></p>
         </article>
       </section>
 
       <section class="grid gap-4 lg:grid-cols-2">
-        <article class="rounded-3xl border border-border bg-card p-4 shadow-glass backdrop-blur-xl sm:p-5">
+        <article class="rounded-3xl border border-border bg-card p-4 shadow-soft sm:p-5">
           <div class="mb-3 flex items-center justify-between">
-            <h2 class="text-2xl text-violet-900">관세</h2>
-            <span id="data-status" class="rounded-full border border-white/60 bg-white/45 px-3 py-1 text-sm text-violet-800">대기</span>
+            <h2 class="text-2xl">관세</h2>
+            <span id="data-status" class="rounded-full border border-border bg-white px-3 py-1 text-sm">대기</span>
           </div>
-          <div class="mb-3 rounded-3xl border border-white/60 bg-gradient-to-r from-pastel/35 to-mint/30 p-4">
-            <p class="text-sm text-violet-700">최종 관세율</p>
-            <p id="tariff-rate" class="text-6xl leading-none text-violet-900">-</p>
+          <div class="mb-3 rounded-3xl border border-border bg-soft p-4">
+            <p class="text-sm">최종 관세율</p>
+            <p id="tariff-rate" class="text-5xl leading-none sm:text-6xl">-</p>
           </div>
-          <div id="summary" class="space-y-2 text-base leading-7 text-violet-900"></div>
-          <div id="result" class="mt-3 rounded-2xl border border-white/60 bg-white/40 p-3 text-base leading-relaxed"></div>
+          <div id="summary" class="space-y-2 text-base leading-7"></div>
+          <div id="result" class="mt-3 rounded-2xl border border-border bg-white p-3 text-base leading-relaxed"></div>
         </article>
 
-        <article class="rounded-3xl border border-border bg-card p-4 shadow-glass backdrop-blur-xl sm:p-5">
+        <article class="rounded-3xl border border-border bg-card p-4 shadow-soft sm:p-5">
           <div class="mb-2 flex items-center justify-between">
-            <h2 class="text-2xl text-violet-900">트렌드 그래프</h2>
-            <span id="chart-time" class="text-xs text-violet-700"></span>
+            <h2 class="text-2xl">트렌드</h2>
+            <span id="chart-time" class="text-xs"></span>
           </div>
-          <svg id="trend-chart" viewBox="0 0 320 180" class="w-full rounded-3xl border border-white/60 bg-white/40 p-2"></svg>
-          <div id="trend-legend" class="mt-2 text-sm text-violet-700"></div>
+          <svg id="trend-chart" viewBox="0 0 320 180" class="w-full rounded-3xl border border-border bg-white p-2"></svg>
+          <div id="trend-legend" class="mt-2 text-sm"></div>
         </article>
       </section>
     </main>
