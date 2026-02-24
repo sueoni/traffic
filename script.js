@@ -38,6 +38,10 @@ const fallbackData = {
 }
 
 const WORLD_BANK_ENDPOINT = 'https://api.worldbank.org/v2/country'
+const UNIPASS_CANDIDATE_ENDPOINTS = [
+  'https://unipass.customs.go.kr/ext/rest/tariff',
+  'https://unipass.customs.go.kr:38010/ext/rest/tariff'
+]
 const PRESET_KEY = 'unipass_presets_v2'
 
 const exportEl = document.getElementById('export-country')
@@ -238,7 +242,6 @@ function renderMessage(message, tone = 'default') {
   resultEl.textContent = message
 }
 
-
 function buildWorldBankUrl(importer) {
   const url = new URL(`${WORLD_BANK_ENDPOINT}/${importer}/indicator/TM.TAX.MRCH.SM.AR.ZS`)
   url.searchParams.set('format', 'json')
@@ -246,11 +249,39 @@ function buildWorldBankUrl(importer) {
   return url.toString()
 }
 
+function buildUniPassUrls(importer, hsCode) {
+  return UNIPASS_CANDIDATE_ENDPOINTS.map((endpoint) => {
+    const url = new URL(endpoint)
+    url.searchParams.set('imprCn', importer)
+    url.searchParams.set('hsCode', hsCode)
+    return url.toString()
+  })
+}
+
 function extractWorldBankRate(payload) {
   if (!Array.isArray(payload) || !Array.isArray(payload[1])) return null
   const entry = payload[1].find((item) => typeof item?.value === 'number')
   if (!entry) return null
   return { rate: entry.value, year: entry.date }
+}
+
+function parseUniPassRate(payload) {
+  const candidates = [
+    payload?.rate,
+    payload?.tariffRate,
+    payload?.data?.rate,
+    payload?.data?.tariffRate,
+    payload?.response?.body?.items?.[0]?.rate,
+    payload?.response?.body?.items?.[0]?.tariffRate
+  ]
+
+  const value = candidates.find((item) => Number.isFinite(Number(item)))
+  if (!Number.isFinite(Number(value))) return null
+
+  return {
+    rate: Number(value),
+    year: payload?.year || payload?.baseYear || new Date().getFullYear().toString()
+  }
 }
 
 async function requestTariff(url) {
@@ -273,6 +304,27 @@ async function requestTariff(url) {
   return proxyParsed
 }
 
+async function requestUniPassTariff(importer, hsCode) {
+  const urls = buildUniPassUrls(importer, hsCode)
+  for (const url of urls) {
+    try {
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+      const res = await fetch(proxyUrl)
+      if (!res.ok) continue
+
+      const payload = await res.json()
+      const parsed = parseUniPassRate(payload)
+      if (parsed) {
+        return { ...parsed, endpoint: url }
+      }
+    } catch {
+      // 다음 후보 엔드포인트 재시도
+    }
+  }
+
+  throw new Error('UNI-PASS 응답을 받지 못했습니다.')
+}
+
 async function fetchUniPassRate() {
   const exporter = exportEl.value
   const importer = importEl.value
@@ -287,13 +339,23 @@ async function fetchUniPassRate() {
   fetchBtn.textContent = '조회 중...'
 
   try {
+    try {
+      const uniPassResult = await requestUniPassTariff(importer, hsCode)
+      dataStatusEl.textContent = 'UNI-PASS'
+      renderMessage(`UNI-PASS 조회 완료 (기준연도 ${uniPassResult.year})`, 'success')
+      updateSummary(Number(uniPassResult.rate.toFixed(1)))
+      return
+    } catch {
+      // UNI-PASS 실패 시 기존 방식 유지
+    }
+
     const url = buildWorldBankUrl(importer)
     const { rate: openApiRate, year } = await requestTariff(url)
     const fallbackRate = calculateFallbackRate() ?? openApiRate
     const tariffRate = Number((openApiRate * 0.7 + fallbackRate * 0.3).toFixed(1))
 
     dataStatusEl.textContent = '오픈API'
-    renderMessage(`오픈 API 조회 완료 (기준연도 ${year})`, 'success')
+    renderMessage(`UNI-PASS 실패, 오픈 API 조회 완료 (기준연도 ${year})`, 'success')
     updateSummary(tariffRate)
   } catch (error) {
     const fallbackRate = calculateFallbackRate()
@@ -309,7 +371,7 @@ async function fetchUniPassRate() {
 setOptions(exportEl, fallbackData.countries.map((country) => ({ value: country.code, label: country.name })))
 setOptions(importEl, fallbackData.countries.map((country) => ({ value: country.code, label: country.name })))
 setOptions(categoryEl, fallbackData.products.map((product) => ({ value: product.value, label: product.label })))
-apiSourceEl.textContent = 'Open API(World Bank) + 내장 보정값 사용'
+apiSourceEl.textContent = 'UNI-PASS 우선 조회 + 실패 시 Open API(World Bank) + 내장 보정값 사용'
 
 presetListEl.addEventListener('change', () => {
   const selectedId = presetListEl.value
