@@ -38,7 +38,12 @@ const fallbackData = {
 }
 
 const WORLD_BANK_ENDPOINT = 'https://api.worldbank.org/v2/country'
+const UNIPASS_CANDIDATE_ENDPOINTS = [
+  'https://unipass.customs.go.kr/ext/rest/tariff',
+  'https://unipass.customs.go.kr:38010/ext/rest/tariff'
+]
 const PRESET_KEY = 'unipass_presets_v2'
+const UNIPASS_KEY_STORAGE = 'unipass_api_key_v1'
 
 const exportEl = document.getElementById('export-country')
 const importEl = document.getElementById('import-country')
@@ -50,6 +55,8 @@ const presetNameEl = document.getElementById('preset-name')
 const presetListEl = document.getElementById('preset-list')
 const savePresetBtn = document.getElementById('save-preset-btn')
 const deletePresetBtn = document.getElementById('delete-preset-btn')
+const uniPassApiKeyEl = document.getElementById('unipass-api-key')
+const saveKeyBtn = document.getElementById('save-key-btn')
 
 const summaryEl = document.getElementById('summary')
 const resultEl = document.getElementById('result')
@@ -59,6 +66,23 @@ const chartEl = document.getElementById('trend-chart')
 const chartTimeEl = document.getElementById('chart-time')
 const trendLegendEl = document.getElementById('trend-legend')
 const apiSourceEl = document.getElementById('api-source')
+
+
+function readUniPassApiKey() {
+  return (localStorage.getItem(UNIPASS_KEY_STORAGE) || '').trim()
+}
+
+function saveUniPassApiKey() {
+  const key = (uniPassApiKeyEl?.value || '').trim()
+  if (!key) {
+    localStorage.removeItem(UNIPASS_KEY_STORAGE)
+    renderMessage('API Key를 비웠습니다. 키 없이 조회합니다.', 'success')
+    return
+  }
+
+  localStorage.setItem(UNIPASS_KEY_STORAGE, key)
+  renderMessage('API Key를 저장했습니다.', 'success')
+}
 
 function setOptions(element, options, emptyText = '-선택-') {
   element.innerHTML = `<option value="">${emptyText}</option>`
@@ -238,7 +262,6 @@ function renderMessage(message, tone = 'default') {
   resultEl.textContent = message
 }
 
-
 function buildWorldBankUrl(importer) {
   const url = new URL(`${WORLD_BANK_ENDPOINT}/${importer}/indicator/TM.TAX.MRCH.SM.AR.ZS`)
   url.searchParams.set('format', 'json')
@@ -246,11 +269,46 @@ function buildWorldBankUrl(importer) {
   return url.toString()
 }
 
+function buildUniPassUrls(importer, hsCode, apiKey = '') {
+  return UNIPASS_CANDIDATE_ENDPOINTS.map((endpoint) => {
+    const url = new URL(endpoint)
+    url.searchParams.set('imprCn', importer)
+    url.searchParams.set('hsCode', hsCode)
+
+    if (apiKey) {
+      url.searchParams.set('apiKey', apiKey)
+      url.searchParams.set('serviceKey', apiKey)
+      url.searchParams.set('crkyCn', apiKey)
+    }
+
+    return url.toString()
+  })
+}
+
 function extractWorldBankRate(payload) {
   if (!Array.isArray(payload) || !Array.isArray(payload[1])) return null
   const entry = payload[1].find((item) => typeof item?.value === 'number')
   if (!entry) return null
   return { rate: entry.value, year: entry.date }
+}
+
+function parseUniPassRate(payload) {
+  const candidates = [
+    payload?.rate,
+    payload?.tariffRate,
+    payload?.data?.rate,
+    payload?.data?.tariffRate,
+    payload?.response?.body?.items?.[0]?.rate,
+    payload?.response?.body?.items?.[0]?.tariffRate
+  ]
+
+  const value = candidates.find((item) => Number.isFinite(Number(item)))
+  if (!Number.isFinite(Number(value))) return null
+
+  return {
+    rate: Number(value),
+    year: payload?.year || payload?.baseYear || new Date().getFullYear().toString()
+  }
 }
 
 async function requestTariff(url) {
@@ -273,6 +331,27 @@ async function requestTariff(url) {
   return proxyParsed
 }
 
+async function requestUniPassTariff(importer, hsCode, apiKey = '') {
+  const urls = buildUniPassUrls(importer, hsCode, apiKey)
+  for (const url of urls) {
+    try {
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+      const res = await fetch(proxyUrl)
+      if (!res.ok) continue
+
+      const payload = await res.json()
+      const parsed = parseUniPassRate(payload)
+      if (parsed) {
+        return { ...parsed, endpoint: url }
+      }
+    } catch {
+      // 다음 후보 엔드포인트 재시도
+    }
+  }
+
+  throw new Error('UNI-PASS 응답을 받지 못했습니다.')
+}
+
 async function fetchUniPassRate() {
   const exporter = exportEl.value
   const importer = importEl.value
@@ -287,13 +366,23 @@ async function fetchUniPassRate() {
   fetchBtn.textContent = '조회 중...'
 
   try {
+    try {
+      const uniPassResult = await requestUniPassTariff(importer, hsCode, readUniPassApiKey())
+      dataStatusEl.textContent = 'UNI-PASS'
+      renderMessage(`UNI-PASS 조회 완료 (기준연도 ${uniPassResult.year})`, 'success')
+      updateSummary(Number(uniPassResult.rate.toFixed(1)))
+      return
+    } catch {
+      // UNI-PASS 실패 시 기존 방식 유지
+    }
+
     const url = buildWorldBankUrl(importer)
     const { rate: openApiRate, year } = await requestTariff(url)
     const fallbackRate = calculateFallbackRate() ?? openApiRate
     const tariffRate = Number((openApiRate * 0.7 + fallbackRate * 0.3).toFixed(1))
 
     dataStatusEl.textContent = '오픈API'
-    renderMessage(`오픈 API 조회 완료 (기준연도 ${year})`, 'success')
+    renderMessage(`UNI-PASS 실패, 오픈 API 조회 완료 (기준연도 ${year})`, 'success')
     updateSummary(tariffRate)
   } catch (error) {
     const fallbackRate = calculateFallbackRate()
@@ -309,7 +398,7 @@ async function fetchUniPassRate() {
 setOptions(exportEl, fallbackData.countries.map((country) => ({ value: country.code, label: country.name })))
 setOptions(importEl, fallbackData.countries.map((country) => ({ value: country.code, label: country.name })))
 setOptions(categoryEl, fallbackData.products.map((product) => ({ value: product.value, label: product.label })))
-apiSourceEl.textContent = 'Open API(World Bank) + 내장 보정값 사용'
+apiSourceEl.textContent = 'UNI-PASS(API Key 선택 입력) 우선 조회 + 실패 시 Open API(World Bank) + 내장 보정값 사용'
 
 presetListEl.addEventListener('change', () => {
   const selectedId = presetListEl.value
@@ -322,6 +411,7 @@ presetListEl.addEventListener('change', () => {
 
 savePresetBtn.addEventListener('click', savePreset)
 deletePresetBtn.addEventListener('click', deletePreset)
+saveKeyBtn?.addEventListener('click', saveUniPassApiKey)
 
 ;[exportEl, importEl, categoryEl].forEach((el) => {
   el.addEventListener('change', () => updateSummary())
@@ -337,6 +427,8 @@ resetBtn.addEventListener('click', () => {
   renderMessage('필터를 다시 선택하세요.')
   updateSummary()
 })
+
+if (uniPassApiKeyEl) uniPassApiKeyEl.value = readUniPassApiKey()
 
 refreshPresetList()
 renderMessage('국가와 품목을 선택하세요.')
