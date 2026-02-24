@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>관세 조회 Pro</title>
+    <title>UNI-PASS 관세 조회</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -33,89 +33,99 @@
     </script>
   </head>
   <body class="min-h-screen bg-background text-foreground">
-    <main class="mx-auto w-full max-w-3xl space-y-4 px-4 py-6">
-      <header class="rounded-2xl border border-border bg-gradient-to-br from-slate-900 to-slate-950 p-5 shadow-soft">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p class="mb-2 inline-flex rounded-full border border-border bg-slate-800/70 px-2.5 py-1 text-xs font-medium text-slate-300">UNI-PASS Connected</p>
-            <h1 class="text-2xl font-bold tracking-tight md:text-3xl">관세 조회 대시보드</h1>
-            <p class="mt-2 text-sm text-muted-foreground">shadcn 스타일 UI로 전면 개편하고 UNI-PASS API 기반 조회 흐름을 추가했습니다.</p>
-          </div>
-          <div class="rounded-xl border border-border bg-slate-900/70 px-3 py-2 text-right text-xs">
-            <p class="text-muted-foreground">업데이트 날짜</p>
-            <p id="update-date" class="font-semibold"></p>
-          </div>
-        </div>
+    <main class="mx-auto w-full max-w-5xl space-y-4 px-4 py-6">
+      <header class="rounded-2xl border border-border bg-card p-5 shadow-soft">
+        <p class="mb-2 inline-flex rounded-full border border-border bg-slate-800/80 px-2.5 py-1 text-xs font-medium text-slate-300">UNI-PASS 기반</p>
+        <h1 class="text-2xl font-bold tracking-tight md:text-3xl">관세 조회</h1>
       </header>
 
-      <section class="grid gap-4 md:grid-cols-3">
-        <article class="md:col-span-2 rounded-2xl border border-border bg-card p-4 shadow-soft">
+      <section class="grid gap-4 lg:grid-cols-3">
+        <article class="lg:col-span-2 rounded-2xl border border-border bg-card p-4 shadow-soft">
           <div class="mb-4 flex items-center justify-between">
-            <h2 class="text-lg font-semibold">조회 필터</h2>
-            <button id="reset-btn" class="rounded-xl border border-border bg-muted px-3 py-2 text-sm font-medium transition hover:bg-slate-700/60 active:scale-95">초기화</button>
+            <h2 class="text-lg font-semibold">필터</h2>
+            <button id="reset-btn" class="rounded-xl border border-border bg-muted px-3 py-2 text-sm font-medium transition hover:bg-slate-700/60">초기화</button>
           </div>
 
           <div class="grid gap-3 md:grid-cols-2">
             <label class="space-y-1 text-sm">
               <span class="text-muted-foreground">수출국</span>
               <select id="export-country" class="w-full rounded-xl border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring">
-                <option value="">선택하세요</option>
+                <option value="">-선택-</option>
               </select>
             </label>
 
             <label class="space-y-1 text-sm">
               <span class="text-muted-foreground">수입국</span>
               <select id="import-country" class="w-full rounded-xl border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring">
-                <option value="">선택하세요</option>
+                <option value="">-선택-</option>
               </select>
             </label>
 
-            <label class="space-y-1 text-sm md:col-span-2">
-              <span class="text-muted-foreground">품목군</span>
+            <label class="space-y-1 text-sm">
+              <span class="text-muted-foreground">품목</span>
               <select id="category" class="w-full rounded-xl border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring">
-                <option value="">선택하세요</option>
+                <option value="">-선택-</option>
               </select>
             </label>
 
             <label class="space-y-1 text-sm">
-              <span class="text-muted-foreground">세부 품목</span>
+              <span class="text-muted-foreground">세부 품목 (선택)</span>
               <select id="item" class="w-full rounded-xl border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring disabled:opacity-50" disabled>
-                <option value="">선택하세요</option>
+                <option value="">-선택-</option>
               </select>
             </label>
 
             <label class="space-y-1 text-sm">
-              <span class="text-muted-foreground">재질</span>
+              <span class="text-muted-foreground">재질 (선택)</span>
               <select id="material" class="w-full rounded-xl border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring disabled:opacity-50" disabled>
-                <option value="">선택하세요</option>
+                <option value="">-선택-</option>
               </select>
             </label>
 
-            <label class="space-y-1 text-sm md:col-span-2">
-              <span class="text-muted-foreground">HS Code (6~10자리)</span>
-              <input id="hs-code" maxlength="10" placeholder="예: 851712" class="w-full rounded-xl border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring" />
+            <label class="space-y-1 text-sm">
+              <span class="text-muted-foreground">HS Code</span>
+              <input id="hs-code" maxlength="10" placeholder="숫자 6~10자리" class="w-full rounded-xl border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring" />
             </label>
           </div>
         </article>
 
         <article class="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-soft">
-          <h2 class="text-lg font-semibold">API 설정</h2>
+          <h2 class="text-lg font-semibold">조회</h2>
           <label class="space-y-1 text-sm">
             <span class="text-muted-foreground">UNI-PASS 인증키</span>
             <input id="api-key" type="password" placeholder="인증키 입력" class="w-full rounded-xl border border-border bg-input px-3 py-2 outline-none focus:ring-2 focus:ring-ring" />
           </label>
-          <button id="save-key-btn" class="w-full rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-slate-950 transition hover:opacity-90">인증키 저장</button>
-          <button id="fetch-btn" class="w-full rounded-xl border border-primary/60 bg-primary/20 px-3 py-2 text-sm font-semibold">UNI-PASS 관세 조회</button>
-          <p class="text-xs text-muted-foreground">브라우저 CORS/키 권한에 따라 조회 실패 시 샘플 계산치가 표시됩니다.</p>
+          <button id="save-key-btn" class="w-full rounded-xl border border-border bg-muted px-3 py-2 text-sm font-semibold">키 저장</button>
+          <button id="fetch-btn" class="w-full rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-slate-950">관세 조회</button>
+          <p id="api-source" class="text-xs text-muted-foreground"></p>
         </article>
       </section>
 
-      <section class="rounded-2xl border border-border bg-card p-5 shadow-soft">
-        <h2 class="text-lg font-semibold">조회 결과</h2>
-        <div id="result" class="mt-3 rounded-xl border border-border bg-slate-900/60 p-4 text-sm">필수 항목을 선택한 후 조회를 실행하세요.</div>
+      <section class="grid gap-4 lg:grid-cols-2">
+        <article class="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <div class="mb-2 flex items-center justify-between">
+            <h2 class="text-lg font-semibold">관세</h2>
+            <span id="data-status" class="rounded-full border border-border bg-muted px-2 py-1 text-xs text-muted-foreground">대기</span>
+          </div>
+          <div class="mb-3 rounded-xl border border-primary/30 bg-primary/10 p-4">
+            <p class="text-xs text-muted-foreground">최종 관세율</p>
+            <p id="tariff-rate" class="text-4xl font-bold text-primary">-</p>
+          </div>
+          <div id="summary" class="space-y-1 text-sm text-slate-200"></div>
+          <div id="result" class="mt-3 rounded-xl border border-border bg-slate-900/40 p-3 text-sm"></div>
+        </article>
+
+        <article class="rounded-2xl border border-border bg-card p-4 shadow-soft">
+          <div class="mb-2 flex items-center justify-between">
+            <h2 class="text-lg font-semibold">월별 트렌드</h2>
+            <span id="chart-time" class="text-xs text-muted-foreground"></span>
+          </div>
+          <svg id="trend-chart" viewBox="0 0 320 180" class="w-full rounded-xl border border-border bg-slate-950/60 p-2"></svg>
+          <div id="trend-legend" class="mt-2 text-xs text-muted-foreground"></div>
+        </article>
       </section>
     </main>
 
-    <script src="script.js"></script>
+    <script src="./script.js"></script>
   </body>
 </html>
