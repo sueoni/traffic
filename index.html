@@ -87,13 +87,9 @@
 
         <article class="space-y-3 rounded-3xl border border-border bg-card p-4 shadow-soft sm:p-5">
           <h2 class="text-2xl">조회</h2>
-          <label class="space-y-1.5 text-base">
-            <span>UNI-PASS 인증키</span>
-            <input id="api-key" type="password" placeholder="인증키 입력" class="min-h-12 w-full rounded-2xl border border-border bg-white px-3 text-base outline-none focus:ring-2 focus:ring-ring" />
-          </label>
-          <button id="save-key-btn" class="min-h-12 w-full rounded-2xl border border-border bg-white text-base">키 저장</button>
+          <p class="rounded-2xl border border-border bg-white px-3 py-3 text-sm leading-relaxed">별도 인증키 없이 오픈 API 기준 관세율을 조회합니다.</p>
           <button id="fetch-btn" class="min-h-12 w-full rounded-2xl bg-point text-base text-slate-900">관세 조회</button>
-          <a href="https://www.customs.go.kr/kcs/na/ntt/selectNttList.do?mi=10819&bbsId=1363" target="_blank" rel="noreferrer" class="block rounded-2xl border border-border bg-white px-3 py-3 text-sm underline underline-offset-4">인증키 발급 안내</a>
+          <a href="https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api-documentation" target="_blank" rel="noreferrer" class="block rounded-2xl border border-border bg-white px-3 py-3 text-sm underline underline-offset-4">오픈 API 안내</a>
           <p id="api-source" class="text-sm leading-relaxed"></p>
         </article>
       </section>
