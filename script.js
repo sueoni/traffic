@@ -23,14 +23,26 @@ const fallbackData = {
   },
   baseTariff: {
     'KR-US': 4,
+    'US-KR': 4,
     'KR-CN': 7,
+    'CN-KR': 7,
     'CN-US': 10,
+    'US-CN': 10,
     'VN-US': 6,
-    'JP-DE': 3
+    'US-VN': 6,
+    'JP-DE': 3,
+    'DE-JP': 3,
+    'KR-JP': 3.5,
+    'JP-KR': 3.5,
+    'KR-DE': 4.5,
+    'DE-KR': 4.5,
+    'CN-JP': 8,
+    'JP-CN': 8
   }
 }
 
 const UNIPASS_ENDPOINT = 'https://unipass.customs.go.kr:38010/ext/rest/trifFxrtInfoQry/retrieveTrifFxrtInfo'
+const PRESET_KEY = 'unipass_presets_v1'
 let countries = [...fallbackData.countries]
 
 const exportEl = document.getElementById('export-country')
@@ -44,6 +56,11 @@ const saveKeyBtn = document.getElementById('save-key-btn')
 const fetchBtn = document.getElementById('fetch-btn')
 const resetBtn = document.getElementById('reset-btn')
 
+const presetNameEl = document.getElementById('preset-name')
+const presetListEl = document.getElementById('preset-list')
+const savePresetBtn = document.getElementById('save-preset-btn')
+const deletePresetBtn = document.getElementById('delete-preset-btn')
+
 const summaryEl = document.getElementById('summary')
 const resultEl = document.getElementById('result')
 const tariffRateEl = document.getElementById('tariff-rate')
@@ -56,14 +73,117 @@ const apiSourceEl = document.getElementById('api-source')
 const savedKey = localStorage.getItem('unipass_api_key') || ''
 if (savedKey) apiKeyEl.value = savedKey
 
-function setOptions(element, options) {
-  element.innerHTML = '<option value="">-선택-</option>'
+function setOptions(element, options, emptyText = '-선택-') {
+  element.innerHTML = `<option value="">${emptyText}</option>`
   options.forEach(({ value, label }) => {
     const opt = document.createElement('option')
     opt.value = value
     opt.textContent = label
     element.appendChild(opt)
   })
+}
+
+function safeReadPresets() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PRESET_KEY) || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writePresets(presets) {
+  localStorage.setItem(PRESET_KEY, JSON.stringify(presets.slice(0, 12)))
+}
+
+function getCurrentFilterValue() {
+  return {
+    exportCountry: exportEl.value,
+    importCountry: importEl.value,
+    category: categoryEl.value,
+    item: itemEl.value,
+    material: materialEl.value,
+    hsCode: hsCodeEl.value.trim()
+  }
+}
+
+function applyFilterValue(filters) {
+  exportEl.value = filters.exportCountry || ''
+  importEl.value = filters.importCountry || ''
+  categoryEl.value = filters.category || ''
+
+  if (categoryEl.value && fallbackData.categories[categoryEl.value]) {
+    const items = Object.entries(fallbackData.categories[categoryEl.value]).map(([key, value]) => ({ value: key, label: value.label }))
+    setOptions(itemEl, items)
+    itemEl.disabled = false
+    itemEl.value = filters.item || ''
+
+    if (itemEl.value && fallbackData.categories[categoryEl.value][itemEl.value]) {
+      const materials = fallbackData.categories[categoryEl.value][itemEl.value].materials.map((material) => ({ value: material, label: material }))
+      setOptions(materialEl, materials)
+      materialEl.disabled = false
+      materialEl.value = filters.material || ''
+    } else {
+      materialEl.disabled = true
+      setOptions(materialEl, [])
+    }
+  } else {
+    itemEl.disabled = true
+    materialEl.disabled = true
+    setOptions(itemEl, [])
+    setOptions(materialEl, [])
+  }
+
+  hsCodeEl.value = filters.hsCode || ''
+  updateSummary()
+}
+
+function refreshPresetList() {
+  const presets = safeReadPresets()
+  setOptions(
+    presetListEl,
+    presets.map((preset) => ({ value: preset.id, label: `${preset.name} · ${preset.filters.exportCountry || '-'}→${preset.filters.importCountry || '-'}` })),
+    presets.length ? '프리셋을 선택하세요' : '저장된 프리셋 없음'
+  )
+}
+
+function savePreset() {
+  const name = presetNameEl.value.trim()
+  if (!name) {
+    renderMessage('프리셋 이름을 입력하세요.', 'error')
+    return
+  }
+
+  const presets = safeReadPresets()
+  const filters = getCurrentFilterValue()
+  const existingIndex = presets.findIndex((preset) => preset.name === name)
+  const newPreset = { id: crypto.randomUUID(), name, filters }
+
+  if (existingIndex >= 0) {
+    presets[existingIndex] = { ...presets[existingIndex], filters }
+    renderMessage(`프리셋 '${name}'을(를) 덮어썼습니다.`, 'success')
+  } else {
+    presets.unshift(newPreset)
+    renderMessage(`프리셋 '${name}'을(를) 저장했습니다.`, 'success')
+  }
+
+  writePresets(presets)
+  refreshPresetList()
+}
+
+function deletePreset() {
+  const selectedId = presetListEl.value
+  if (!selectedId) {
+    renderMessage('삭제할 프리셋을 선택하세요.', 'error')
+    return
+  }
+
+  const presets = safeReadPresets()
+  const selected = presets.find((preset) => preset.id === selectedId)
+  const next = presets.filter((preset) => preset.id !== selectedId)
+  writePresets(next)
+  refreshPresetList()
+  renderMessage(`프리셋 '${selected?.name || ''}'을(를) 삭제했습니다.`, 'success')
 }
 
 async function tryLoadCountries() {
@@ -112,6 +232,7 @@ function drawTrendChart(baseRate) {
   chartEl.innerHTML = ''
   if (baseRate === null) {
     trendLegendEl.textContent = '필수 항목 선택 후 트렌드를 표시합니다.'
+    chartTimeEl.textContent = ''
     return
   }
 
@@ -154,9 +275,9 @@ function updateSummary(rate = null) {
   const displayRate = rate ?? calculateFallbackRate()
 
   summaryEl.innerHTML = `
-    <p><span class="text-muted-foreground">수출국/수입국</span> ${exporterName} → ${importerName}</p>
-    <p><span class="text-muted-foreground">품목</span> ${category} / ${item} / ${material}</p>
-    <p><span class="text-muted-foreground">HS Code</span> ${hsCode}</p>
+    <p><span class="text-muted-foreground">수출국/수입국</span> <span class="font-semibold">${exporterName} → ${importerName}</span></p>
+    <p><span class="text-muted-foreground">품목</span> <span class="font-semibold">${category} / ${item} / ${material}</span></p>
+    <p><span class="text-muted-foreground">HS Code</span> <span class="font-semibold tracking-wide">${hsCode}</span></p>
   `
 
   tariffRateEl.textContent = displayRate === null ? '-' : `${displayRate}%`
@@ -165,7 +286,7 @@ function updateSummary(rate = null) {
 
 function renderMessage(message, tone = 'default') {
   const toneClass = tone === 'error' ? 'text-rose-300' : tone === 'success' ? 'text-emerald-300' : 'text-slate-300'
-  resultEl.className = `mt-3 rounded-xl border border-border bg-slate-900/40 p-3 text-sm ${toneClass}`
+  resultEl.className = `mt-3 rounded-xl border border-border bg-slate-900/40 p-3 text-sm leading-relaxed ${toneClass}`
   resultEl.textContent = message
 }
 
@@ -215,7 +336,7 @@ async function fetchUniPassRate() {
   } catch (error) {
     const fallbackRate = calculateFallbackRate()
     dataStatusEl.textContent = '대체값'
-    renderMessage(`실조회 실패: ${error.message}. 대체 계산치를 표시합니다.`, 'error')
+    renderMessage(`실조회 실패: ${error.message}. 내장 기준 관세 데이터 기반 대체값을 표시합니다.`, 'error')
     updateSummary(fallbackRate)
   } finally {
     fetchBtn.disabled = false
@@ -261,6 +382,18 @@ itemEl.addEventListener('change', () => {
   updateSummary()
 })
 
+presetListEl.addEventListener('change', () => {
+  const selectedId = presetListEl.value
+  const selected = safeReadPresets().find((preset) => preset.id === selectedId)
+  if (!selected) return
+  presetNameEl.value = selected.name
+  applyFilterValue(selected.filters)
+  renderMessage(`프리셋 '${selected.name}'을(를) 불러왔습니다.`, 'success')
+})
+
+savePresetBtn.addEventListener('click', savePreset)
+deletePresetBtn.addEventListener('click', deletePreset)
+
 ;[exportEl, importEl, materialEl, hsCodeEl].forEach((el) => {
   el.addEventListener('change', () => updateSummary())
   el.addEventListener('input', () => updateSummary())
@@ -287,6 +420,7 @@ resetBtn.addEventListener('click', () => {
   updateSummary()
 })
 
+refreshPresetList()
 renderMessage('수출국/수입국/품목을 선택하면 관세와 트렌드가 표시됩니다.')
 updateSummary()
 tryLoadCountries()
