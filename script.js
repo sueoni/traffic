@@ -12,10 +12,10 @@ const fallbackData = {
     { name: '한국', code: 'KR' }
   ],
   products: [
-    { value: 'set', label: 'Set', hsCode: '847330' },
-    { value: 'module', label: 'Module', hsCode: '854239' },
+    { value: 'set', label: '세트', hsCode: '847330' },
+    { value: 'module', label: '모듈', hsCode: '854239' },
     { value: 'raw', label: '원소재', hsCode: '390190' },
-    { value: 'press', label: 'Press', hsCode: '846229' },
+    { value: 'press', label: '프레스', hsCode: '846229' },
     { value: 'injection', label: '사출', hsCode: '847710' },
     { value: 'extrusion', label: '압출', hsCode: '847720' },
     { value: 'packaging', label: '포장', hsCode: '481910' }
@@ -199,20 +199,20 @@ function drawTrendChart(baseRate) {
   chartEl.innerHTML = `
     <defs>
       <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="hsl(290 75% 76%)" />
-        <stop offset="100%" stop-color="hsl(178 70% 74%)" />
+        <stop offset="0%" stop-color="hsl(246 56% 67%)" />
+        <stop offset="100%" stop-color="hsl(218 54% 67%)" />
       </linearGradient>
       <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="hsl(290 75% 76% / 0.45)" />
-        <stop offset="100%" stop-color="hsl(178 70% 74% / 0.02)" />
+        <stop offset="0%" stop-color="hsl(242 60% 72% / 0.36)" />
+        <stop offset="100%" stop-color="hsl(219 62% 74% / 0.05)" />
       </linearGradient>
     </defs>
-    <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="hsl(256 42% 75% / 0.45)" />
+    <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="hsl(236 24% 73% / 0.55)" />
     <polygon points="${area}" fill="url(#areaGradient)" />
     <polyline points="${line}" fill="none" stroke="url(#lineGradient)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
     ${points
       .map(
-        (value, idx) => `<circle cx="${mapX(idx)}" cy="${mapY(value)}" r="3.3" fill="hsl(292 72% 74%)" stroke="hsl(0 0% 100% / 0.85)" stroke-width="1.6" />`
+        (value, idx) => `<circle cx="${mapX(idx)}" cy="${mapY(value)}" r="3.3" fill="hsl(240 48% 72%)" stroke="hsl(0 0% 100% / 0.9)" stroke-width="1.6" />`
       )
       .join('')}
   `
@@ -228,9 +228,9 @@ function updateSummary(rate = null) {
   const displayRate = rate ?? calculateFallbackRate()
 
   summaryEl.innerHTML = `
-    <p><span class="text-violet-700">수출국/수입국</span> <span class="font-semibold text-violet-950">${exporterName} → ${importerName}</span></p>
-    <p><span class="text-violet-700">품목</span> <span class="font-semibold text-violet-950">${product?.label || '-'}</span></p>
-    <p><span class="text-violet-700">자동 매핑 HS Code</span> <span class="font-semibold tracking-wide text-violet-950">${hsCode}</span></p>
+    <p><span class="text-slate-600">수출국/수입국</span> <span class="font-semibold text-slate-900">${exporterName} → ${importerName}</span></p>
+    <p><span class="text-slate-600">품목</span> <span class="font-semibold text-slate-900">${product?.label || '-'}</span></p>
+    <p><span class="text-slate-600">자동 매핑 HS Code</span> <span class="font-semibold tracking-wide text-slate-900">${hsCode}</span></p>
   `
 
   tariffRateEl.textContent = displayRate === null ? '-' : `${displayRate}%`
@@ -238,9 +238,45 @@ function updateSummary(rate = null) {
 }
 
 function renderMessage(message, tone = 'default') {
-  const toneClass = tone === 'error' ? 'text-rose-700' : tone === 'success' ? 'text-emerald-700' : 'text-violet-800'
-  resultEl.className = `mt-3 rounded-2xl border border-white/60 bg-white/40 p-3 text-base leading-relaxed ${toneClass}`
+  const toneClass = tone === 'error' ? 'text-rose-700' : tone === 'success' ? 'text-emerald-700' : 'text-slate-800'
+  resultEl.className = `mt-3 rounded-2xl border border-border bg-white p-3 text-base leading-relaxed ${toneClass}`
   resultEl.textContent = message
+}
+
+
+function buildUniPassUrl(apiKey, exporter, importer, hsCode) {
+  const url = new URL(UNIPASS_ENDPOINT)
+  url.searchParams.set('crkyCn', apiKey)
+  url.searchParams.set('expDclrNatCd', exporter)
+  url.searchParams.set('imprDclrNatCd', importer)
+  url.searchParams.set('hsSgn', hsCode)
+  return url.toString()
+}
+
+function extractTariffRate(text) {
+  const match = text.match(/<(?:aplyRate|tariffRate|trffRt|rate)>(\d+(?:\.\d+)?)<\//i) || text.match(/(\d+(?:\.\d+)?)\s*%/)
+  const tariffRate = match ? Number(match[1]) : null
+  return tariffRate === null || Number.isNaN(tariffRate) ? null : tariffRate
+}
+
+async function requestTariff(url) {
+  try {
+    const direct = await fetch(url)
+    if (!direct.ok) throw new Error(`HTTP ${direct.status}`)
+    const text = await direct.text()
+    const rate = extractTariffRate(text)
+    if (rate !== null) return rate
+  } catch {
+    // CORS 또는 네트워크 실패 시 프록시 재시도
+  }
+
+  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+  const proxy = await fetch(proxyUrl)
+  if (!proxy.ok) throw new Error(`Proxy HTTP ${proxy.status}`)
+  const proxyText = await proxy.text()
+  const proxyRate = extractTariffRate(proxyText)
+  if (proxyRate === null) throw new Error('관세율 파싱 실패')
+  return proxyRate
 }
 
 async function fetchUniPassRate() {
@@ -263,27 +299,16 @@ async function fetchUniPassRate() {
   fetchBtn.textContent = '조회 중...'
 
   try {
-    const url = new URL(UNIPASS_ENDPOINT)
-    url.searchParams.set('crkyCn', apiKey)
-    url.searchParams.set('expDclrNatCd', exporter)
-    url.searchParams.set('imprDclrNatCd', importer)
-    url.searchParams.set('hsSgn', hsCode)
-
-    const response = await fetch(url.toString())
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-    const text = await response.text()
-    const match = text.match(/<(?:aplyRate|tariffRate|trffRt|rate)>(\d+(?:\.\d+)?)<\//i) || text.match(/(\d+(?:\.\d+)?)\s*%/)
-    const tariffRate = match ? Number(match[1]) : null
-    if (tariffRate === null || Number.isNaN(tariffRate)) throw new Error('관세율 파싱 실패')
+    const url = buildUniPassUrl(apiKey, exporter, importer, hsCode)
+    const tariffRate = await requestTariff(url)
 
     dataStatusEl.textContent = '실조회'
-    renderMessage('UNI-PASS 실시간 관세 조회 성공', 'success')
+    renderMessage('UNI-PASS 실시간 조회 완료', 'success')
     updateSummary(tariffRate)
   } catch (error) {
     const fallbackRate = calculateFallbackRate()
     dataStatusEl.textContent = '대체값'
-    renderMessage(`실조회 실패: ${error.message}. 내장 기준값을 표시합니다.`, 'error')
+    renderMessage(`조회 실패: ${error.message} · 대체값 표시`, 'error')
     updateSummary(fallbackRate)
   } finally {
     fetchBtn.disabled = false
@@ -294,7 +319,7 @@ async function fetchUniPassRate() {
 setOptions(exportEl, fallbackData.countries.map((country) => ({ value: country.code, label: country.name })))
 setOptions(importEl, fallbackData.countries.map((country) => ({ value: country.code, label: country.name })))
 setOptions(categoryEl, fallbackData.products.map((product) => ({ value: product.value, label: product.label })))
-apiSourceEl.textContent = '국가/품목: 요청한 고정 목록 사용'
+apiSourceEl.textContent = '고정 국가·품목만 사용'
 
 presetListEl.addEventListener('change', () => {
   const selectedId = presetListEl.value
@@ -329,5 +354,5 @@ resetBtn.addEventListener('click', () => {
 })
 
 refreshPresetList()
-renderMessage('국가와 품목을 선택하면 관세와 트렌드가 표시됩니다.')
+renderMessage('국가와 품목을 선택하세요.')
 updateSummary()
